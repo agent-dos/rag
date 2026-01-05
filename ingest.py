@@ -4,6 +4,8 @@ Ingest documents into ChromaDB vector database.
 Usage:
     python ingest.py                           # Default: ingest docs/brain
     python ingest.py --source ./my-docs        # Custom source
+    python ingest.py --text "Your text here"   # Ingest text directly
+    python ingest.py --text "text" --text-source "my-doc.md"
     python ingest.py --chunk-by fixed --chunk-size 500
     python ingest.py --dry-run                 # Preview without ingesting
     python ingest.py --clear                   # Clear collection first
@@ -80,6 +82,18 @@ def parse_args():
         type=str,
         default="*.md",
         help="Glob pattern for files (default: *.md)"
+    )
+    parser.add_argument(
+        "--text", "-t",
+        type=str,
+        default=None,
+        help="Ingest text directly instead of from files"
+    )
+    parser.add_argument(
+        "--text-source",
+        type=str,
+        default="direct-input",
+        help="Source name for text ingestion (default: direct-input)"
     )
     parser.add_argument(
         "--clear",
@@ -242,36 +256,71 @@ def chunk_by_fixed_size(content: str, filename: str, chunk_size: int, overlap: i
     return chunks
 
 
+def process_text_input(text: str, source_name: str, chunk_by: str, chunk_size: int, overlap: int) -> list[dict]:
+    """Process direct text input into chunks."""
+    if not isinstance(text, str):
+        raise TypeError("text must be a string")
+    if not isinstance(source_name, str):
+        raise TypeError("source_name must be a string")
+
+    if not text.strip():
+        return []
+
+    if chunk_by == "headers":
+        return chunk_by_headers(text, source_name)
+    else:
+        return chunk_by_fixed_size(text, source_name, chunk_size, overlap)
+
+
 def ingest_documents(args):
     """Main ingestion function."""
-    print(f"Source: {args.source}")
-    print(f"Database: {args.db_path}")
-    print(f"Collection: {args.collection}")
-    print(f"Chunking: {args.chunk_by}" + (f" (size={args.chunk_size}, overlap={args.overlap})" if args.chunk_by == "fixed" else ""))
-    print()
+    # Text mode: ingest directly from --text argument
+    if args.text is not None:
+        print(f"Mode: Text input")
+        print(f"Source name: {args.text_source}")
+        print(f"Database: {args.db_path}")
+        print(f"Collection: {args.collection}")
+        print(f"Chunking: {args.chunk_by}" + (f" (size={args.chunk_size}, overlap={args.overlap})" if args.chunk_by == "fixed" else ""))
+        print(f"Text length: {len(args.text)} chars")
+        print()
 
-    # Get files
-    files = get_files(args.source, args.glob)
-    if not files:
-        print("No files found.")
-        return
+        all_chunks = process_text_input(
+            args.text,
+            args.text_source,
+            args.chunk_by,
+            args.chunk_size,
+            args.overlap
+        )
+    else:
+        # File mode: ingest from directory
+        print(f"Source: {args.source}")
+        print(f"Database: {args.db_path}")
+        print(f"Collection: {args.collection}")
+        print(f"Chunking: {args.chunk_by}" + (f" (size={args.chunk_size}, overlap={args.overlap})" if args.chunk_by == "fixed" else ""))
+        print()
 
-    print(f"Found {len(files)} files")
+        # Get files
+        files = get_files(args.source, args.glob)
+        if not files:
+            print("No files found.")
+            return
 
-    # Process files into chunks
-    all_chunks = []
-    for file_path in files:
-        if args.verbose:
-            print(f"  Processing: {file_path.name}")
+        print(f"Found {len(files)} files")
 
-        content = file_path.read_text(encoding="utf-8")
+        # Process files into chunks
+        all_chunks = []
+        for file_path in files:
+            if args.verbose:
+                print(f"  Processing: {file_path.name}")
 
-        if args.chunk_by == "headers":
-            chunks = chunk_by_headers(content, file_path.name)
-        else:
-            chunks = chunk_by_fixed_size(content, file_path.name, args.chunk_size, args.overlap)
+            content = file_path.read_text(encoding="utf-8")
 
-        all_chunks.extend(chunks)
+            if args.chunk_by == "headers":
+                chunks = chunk_by_headers(content, file_path.name)
+            else:
+                chunks = chunk_by_fixed_size(content, file_path.name, args.chunk_size, args.overlap)
+
+            all_chunks.extend(chunks)
 
     print(f"Total chunks: {len(all_chunks)}")
 
