@@ -2,18 +2,19 @@
 Ingest documents into ChromaDB vector database.
 
 Usage:
-    python ingest.py                           # Default: ingest docs/brain
-    python ingest.py --source ./my-docs        # Custom source
+    python ingest.py --source docs/brain       # Ingest from directory (required)
+    python ingest.py --source ./my-docs        # Custom source directory
     python ingest.py --text "Your text here"   # Ingest text directly
     python ingest.py --text "text" --text-source "my-doc.md"
-    python ingest.py --chunk-by fixed --chunk-size 500
-    python ingest.py --dry-run                 # Preview without ingesting
-    python ingest.py --clear                   # Clear collection first
-    python ingest.py --verbose                 # Show detailed output
+    python ingest.py --source docs/brain --chunk-by fixed --chunk-size 500
+    python ingest.py --source docs/brain --dry-run   # Preview without ingesting
+    python ingest.py --source docs/brain --clear     # Clear collection first
+    python ingest.py --source docs/brain --verbose   # Show detailed output
 """
 
 import argparse
 import re
+import sys
 from datetime import datetime
 import chromadb
 from chromadb.utils import embedding_functions
@@ -21,7 +22,6 @@ from pathlib import Path
 
 
 # Defaults
-DEFAULT_SOURCE = Path(__file__).parent.parent / "docs" / "legacy" / "v2" / "brain"
 DEFAULT_DB_PATH = Path(__file__).parent / "chroma_db"
 DEFAULT_COLLECTION = "brain_docs"
 DEFAULT_MODEL = "all-MiniLM-L6-v2"
@@ -38,8 +38,8 @@ def parse_args():
     parser.add_argument(
         "--source", "-s",
         type=Path,
-        default=DEFAULT_SOURCE,
-        help=f"Source directory with markdown files (default: {DEFAULT_SOURCE})"
+        default=None,
+        help="Source directory with markdown files (required unless --text is used)"
     )
     parser.add_argument(
         "--db-path", "-d",
@@ -274,6 +274,15 @@ def process_text_input(text: str, source_name: str, chunk_by: str, chunk_size: i
 
 def ingest_documents(args):
     """Main ingestion function."""
+    # Validate arguments
+    if args.text is None and args.source is None:
+        print("Error: Either --source or --text must be provided")
+        print("\nUsage:")
+        print("  python ingest.py --source docs/brain")
+        print("  python ingest.py --text 'Your content here'")
+        print("\nRun 'python ingest.py --help' for more options")
+        sys.exit(1)
+
     # Text mode: ingest directly from --text argument
     if args.text is not None:
         print(f"Mode: Text input")
