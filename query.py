@@ -2,11 +2,10 @@
 Query the brain documents vector database.
 
 Usage:
-    python query.py "search query"              # Basic search
+    python query.py "search query"              # Basic search (sorted by latest)
     python query.py "query" -n 10               # Get 10 results
     python query.py "query" -t 0.5              # Filter by distance threshold
     python query.py "query" --source "*.md"     # Filter by source pattern
-    python query.py "query" --latest            # Sort by latest timestamp first
     python query.py "query" --json              # Output as JSON
     python query.py --interactive               # Interactive mode
     python query.py --stats                     # Show collection stats
@@ -120,11 +119,6 @@ def parse_args():
         "--list-sources",
         action="store_true",
         help="List all unique source files in the collection"
-    )
-    parser.add_argument(
-        "--latest",
-        action="store_true",
-        help="Sort results by latest timestamp first (requires re-ingestion with timestamps)"
     )
 
     return parser.parse_args()
@@ -309,7 +303,7 @@ def interactive_mode(collection, args):
             print("  <query>      - Search for query")
             continue
 
-        matches = search(collection, query, args.num_results, args.threshold, args.source, args.latest)
+        matches = search(collection, query, args.num_results, args.threshold, args.source, sort_latest=True)
         print_results(query, matches, args)
 
 
@@ -337,7 +331,7 @@ def main():
         sys.exit(1)
 
     collection = get_collection(args.db_path, args.collection, args.model)
-    matches = search(collection, args.query, args.num_results, args.threshold, args.source, args.latest)
+    matches = search(collection, args.query, args.num_results, args.threshold, args.source, sort_latest=True)
     print_results(args.query, matches, args)
 
 
