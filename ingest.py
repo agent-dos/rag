@@ -4,8 +4,8 @@ Ingest documents into ChromaDB vector database.
 Usage:
     python ingest.py --source docs/brain       # Ingest from directory (required)
     python ingest.py --source ./my-docs        # Custom source directory
-    python ingest.py --text "Your text here"   # Ingest text directly
-    python ingest.py --text "text" --text-source "my-doc.md"
+    python ingest.py --text "Your text" --text-source "20250107-notes"  # Ingest text directly (source required)
+    python ingest.py --text "text" --text-source "20250107-143022-api-docs"
     python ingest.py --source docs/brain --chunk-by fixed --chunk-size 500
     python ingest.py --source docs/brain --dry-run   # Preview without ingesting
     python ingest.py --source docs/brain --clear     # Clear collection first
@@ -92,8 +92,8 @@ def parse_args():
     parser.add_argument(
         "--text-source",
         type=str,
-        default="direct-input",
-        help="Source name for text ingestion (default: direct-input)"
+        default=None,
+        help="Source name for text ingestion (required when using --text, format: YYYYMMDD-name)"
     )
     parser.add_argument(
         "--clear",
@@ -285,6 +285,21 @@ def ingest_documents(args):
 
     # Text mode: ingest directly from --text argument
     if args.text is not None:
+        # Require text-source for text input
+        if not args.text_source:
+            print("Error: --text-source is required when using --text")
+            print("\nRecommended format: YYYYMMDD-name or YYYYMMDD-HHMMSS-name")
+            print("Examples:")
+            print("  --text-source '20250107-meeting-notes'")
+            print("  --text-source '20250107-143022-api-docs'")
+            sys.exit(1)
+
+        # Warn if source doesn't match expected pattern
+        if extract_timestamp(args.text_source) == 0:
+            print(f"Warning: --text-source '{args.text_source}' doesn't contain a valid timestamp")
+            print("Recommended format: YYYYMMDD-name or YYYYMMDD-HHMMSS-name")
+            print("Continuing with current timestamp...\n")
+
         print(f"Mode: Text input")
         print(f"Source name: {args.text_source}")
         print(f"Database: {args.db_path}")
@@ -384,6 +399,9 @@ def ingest_documents(args):
         metadatas = []
         for c in all_chunks:
             timestamp = extract_timestamp(c["source"])
+            # Fallback to current time for text input without valid timestamp
+            if timestamp == 0 and args.text is not None:
+                timestamp = int(datetime.now().timestamp())
             metadatas.append({
                 "header": c["header"],
                 "source": c["source"],
